@@ -5,8 +5,14 @@
 //        <span id="likes-count-for-image-1">41</span>
 //    </p>
 // </div>
+const LIKE_URL = 'http://localhost:3000/api/v1/likes'
+const IMAGE_URL = 'http://localhost:3000/api/v1/images'
 
 const imageContainers = document.getElementById('container')
+
+const uploadImageForm = document.getElementById('post-image-form')
+uploadImageForm.addEventListener('submit', postImgURL)
+
 class App {
   static createElement (element, attribute = '', parent = '', inner = '') {
     if (typeof (element) === 'undefined') {
@@ -39,30 +45,35 @@ class App {
     return e
   }
 }
-fetch ('http://localhost:3000/api/v1/images').then(function(response) {
-    return response.json();
-  }).then(function(masterImageList) {
-    for (image of masterImageList) {
-      const imageDiv = Image.renderImages(image)
-      imageContainers.appendChild(imageDiv)
-    }
-  })
-
-const submitImgAction = document.getElementById('post-image-form')
-submitImgAction.addEventListener('submit', postImgURL)
 
 function postImgURL (event) {
-  debugger
-  const url = event.currentTarget
-  fetch('http://localhost:3000/api/v1/images', {
+  const url = document.getElementById('post-image-form-url').value
+  window.fetch('http://localhost:3000/api/v1/images', {
     method: 'post',
-    body: {url: `${url}`}
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url: `${url}`})
+  }).then(function (response) {
+    return response.json()
+  }).then(function (e) { console.log(e) }).then(function (imageObj) {
+    Image.render(imageObj, imageContainers)
   })
 }
 
+function updateImage (imageId) {
+  window.fetch(IMAGE_URL).then(function (response) {
+    return response.json()
+  }).then(function (masterImageList) {
+    return masterImageList.find(imageObj => imageObj.id == imageId)
+  }).then(function (imageObj) {
+    const oldImgData = document.getElementById(`likes-count-for-image-${imageId}`).parentNode.parentNode
+    const newImgData = Image.render(imageObj, '')
+    const paterImgData = oldImgData.parentNode
+    paterImgData.replaceChild(newImgData, oldImgData)
+  })
+}
 class Image {
-  static renderImages () {
-    const imgDiv = App.createElement('div', {class: 'image-container'}, imageContainers)
+  static render (image, parent) {
+    const imgDiv = App.createElement('div', {class: 'image-container'}, parent)
     const imgURL = App.createElement('img', {src: `${image.url}`}, imgDiv)
     const para = App.createElement('p', '', imgDiv)
     const imgData = App.createElement('img', [{class: 'like-button'}, {src: './images/like.png'}], para)
@@ -73,17 +84,26 @@ class Image {
     const imgLikes = App.createElement('span', {id: `likes-count-for-image-${image.id}`}, para, `${image.likes_count}`)
 
     return imgDiv
-  } 
+  }
 
   static likeImageAction (event) {
     const imgId = event.currentTarget.dataset.imageId
-    fetch('http://localhost:3000/api/v1/likes', {
+    window.fetch(LIKE_URL, {
       method: 'post',
-      body: {image_id: `${imgId}`}
-    }).then(function(response) {
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({image_id: `${imgId}`})
+    }).then(function (response) {
       return response.json()
-    }).then(function(imageObj) {
-      debugger
-      document.getElementById(`likes-count-for-image-${imageObj.id}`).innerText = `${imageObj.likes_count}`
+    }).then(function (imgIdObj) {
+      updateImage(imgIdObj.image_id)
     })
   }
+}
+
+window.fetch('http://localhost:3000/api/v1/images').then(function (response) {
+  return response.json()
+}).then(function (masterImageList) {
+  for (let image of masterImageList) {
+    const imageDiv = Image.render(image, imageContainers)
+  }
+})
